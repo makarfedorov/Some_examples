@@ -3,6 +3,7 @@ import bs4
 from bs4 import BeautifulSoup
 import requests
 import re
+from lxml import etree
 from prereform2modern import Processor
 
 
