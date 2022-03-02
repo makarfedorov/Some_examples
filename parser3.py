@@ -7,6 +7,7 @@ from prereform2modern import Processor
 from lxml import etree
 
 
+ns = {None:"http://www.tei-c.org/ns/1.0", "xi": "http://www.w3.org/2001/XInclude"}
 
 volume_id = {47:["h000011001", "h000011002"], 48:["h000011001", "h000011013"],
              49:["h000010001", "h000010005"], 50:["h000010001", "h000010003"],
@@ -15,7 +16,7 @@ volume_id = {47:["h000011001", "h000011002"], 48:["h000011001", "h000011013"],
              55:["h000011001","h000011009"], 56:["h000010001", "h000010009"],
              57:["h000011001", "h000011003"], 58:["h000012001", "h000012014"]}
 
-tag_dict = {"h2":"head", "h3":"head", "tr":"row", "td":"cell"}
+tag_dict = {"h2":"head", "h3":"head", "tr":"row", "td":"cell", "em":"hi"}
 
 def get_html(url):
     html = requests.get(url).text
@@ -27,7 +28,6 @@ def TEI_template():
     :param: None
     :return: lxml.etree._Element
     """
-    ns = {None:"http://www.tei-c.org/ns/1.0", "xi": "http://www.w3.org/2001/XInclude"}
     root = etree.Element("TEI", nsmap = ns)
     teiHeader = etree.Element("teiHeader")
     root.append(teiHeader)
@@ -278,6 +278,21 @@ def fill_template(root):
     biblScope = root.find(".//biblScope")
     biblScope.text = str(vol_id)
 
+def subsitute_notes(soup, p):
+    for note in p.findall(".//a[@type='note']"):
+        #print(note.text)
+        #print("cvcvcvcvcvccv")
+        note_number = note.get("href")[1::]
+        number = note_number[1::]
+        back_note = soup.find(id=note_number)
+        back_note_text = shorten_text(back_note.find("p").get_text())
+        note.text = back_note_text
+        note.tag = "note"
+        for atr in note.keys():
+            del note.attrib[atr]
+        note.set("{" + ns["xi"] + "}" + "id", f"note{number}")
+    return p
+
 def entry_line_tag(tag_, text_tag):
     if tag_.tag == "p":
         #print(etree.tostring(tag_, encoding="unicode"))
@@ -287,10 +302,12 @@ def entry_line_tag(tag_, text_tag):
         else:
              div = etree.Element("div")
              div.set("type", "entry")
-             div.append(tag_)
+             div.append(subsitute_notes(soup, tag_))
              text_tag.append(div)
     else:
-        text_tag.append(tag_)
+        text_tag.append(subsitute_notes(soup, tag_))
+
+
 
 def make_file(file):        
     root = TEI_template()
@@ -324,7 +341,7 @@ def change2tei(root):
         if a in tag_dict:
             tag_.tag = tag_dict[a]
 
-  
+
 def pipline():
     global html_dict
     global vol_id
