@@ -74,8 +74,6 @@ def TEI_template():
     teiHeader.append(encodingDesc)
     tagsDecl = etree.Element("tagsDecl")
     encodingDesc.append(tagsDecl)
-    text = etree.Element("text")
-    root.append(text)
     return root
   
   
