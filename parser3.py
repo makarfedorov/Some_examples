@@ -15,6 +15,8 @@ volume_id = {47:["h000011001", "h000011002"], 48:["h000011001", "h000011013"],
              55:["h000011001","h000011009"], 56:["h000010001", "h000010009"],
              57:["h000011001", "h000011003"], 58:["h000012001", "h000012014"]}
 
+tag_dict = {"h2":"head", "h3":"head", "tr":"row", "td":"cell"}
+
 def get_html(url):
     html = requests.get(url).text
     return html 
@@ -245,3 +247,98 @@ def normalise_em(text):
         text = pattern4.sub("<em>\g<1>\g<2></em>", text)
 
     return text
+
+def preprosess(str_tag):
+    a = shorten_text(str(str_tag))
+    a = normalise_em(a)
+    a = markup_choices_for_editorial_corrections(a)
+    a = markup_choices_for_prereform_spelling(a)
+    return a
+def preprosess_exeption(str_tag):
+    if re.search("<1 стерто\]", str_tag):
+        a = re.sub("<1 стерто\]", "[1 стерто]", str_tag)
+    a = normalise_em(str_tag)
+    a = brasket_hyphenation(a)
+    a = markup_edit_cycle(a)
+    a = markup_choices_for_prereform_spelling(a)  
+    return a
+def html_to_xml(html_tag):
+   html_tag = str(html_tag)
+   preprosessed =  preprosess(html_tag)
+   try:
+       tag = etree.fromstring(preprosessed)
+   except etree.XMLSyntaxError as err:
+       preprosessed = preprosess_exeption(html_tag)
+       tag = etree.fromstring(preprosessed)
+   return tag
+
+def fill_template(root):
+    title = root.find(".//title")
+    title.text = get_title(soup, file).text
+    biblScope = root.find(".//biblScope")
+    biblScope.text = str(vol_id)
+
+def entry_line_tag(tag_, text_tag):
+    if tag_.tag == "p":
+        #print(etree.tostring(tag_, encoding="unicode"))
+        text = ''.join(tag_.itertext())
+        if re.search("^(—|=)*$", text):
+            text_tag.append(tag_)
+        else:
+             div = etree.Element("div")
+             div.set("type", "entry")
+             div.append(tag_)
+             text_tag.append(div)
+    else:
+        text_tag.append(tag_)
+
+def make_file(file):        
+    root = TEI_template()
+    text_tag = etree.Element("text")
+    root.append(text_tag)
+    pattern_one_div = '''<p class="left">Январь. 1 \[14\]\. Вторникъ'''
+    print(get_title(soup, file))
+    fill_template(root)
+    for part in html_dict[file]:
+        for child in id_to_html(soup, part):
+            if isinstance(child, bs4.element.Tag):
+                if re.search(pattern_one_div, shorten_text(str(child))):
+                    for child_div in child:
+                        if isinstance(child_div, bs4.element.Tag):
+                            tag = html_to_xml(child_div)
+                            
+                            entry_line_tag(tag, text_tag)
+                        
+                                
+                else:
+                            
+                    tag = html_to_xml(child)
+                    entry_line_tag(tag, text_tag)
+    return root
+
+def change2tei(root):
+    name_space = "http://www.tei-c.org/ns/1.0"
+    text = root.find(f".//text")
+    for tag_ in text.iter():
+        a = tag_.tag
+        if a in tag_dict:
+            tag_.tag = tag_dict[a]
+
+  
+def pipline():
+    global html_dict
+    global vol_id
+    global file
+    global soup
+    for vol_id in volume_id:
+      url =  f"http://tolstoy.ru/online/90/{vol_id}/"
+      html_text = get_html(url)
+      soup = BeautifulSoup(html_text, 'html.parser')
+      first_id, last_id = volume_id[vol_id][0], volume_id[vol_id][1]
+
+      html_dict = get_html_dict(soup, first_id, last_id)
+      print(vol_id)
+      for file in html_dict:
+          file2 = make_file(file)
+          change2tei(file2)
+          print(etree.tostring(file2, pretty_print=True, encoding = "unicode"))
