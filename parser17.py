@@ -900,3 +900,6 @@ def pipline():
           print(etree.tostring(file2, pretty_print=True, encoding = "unicode"))
           Element_tree = etree.ElementTree(file2)
           Element_tree.write(f"{title} {vol_id}.xml", encoding = "utf-8", xml_declaration=True, pretty_print=True)
+   
+if __name__ == "__main__":
+    pipline()
